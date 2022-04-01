@@ -1,0 +1,206 @@
+---
+title: "What Make Coffee Popular?"
+author: "Ken Trinh, Michelle Lee, Tanmay Mahapatra"
+date: "03/30/2022"
+output:
+  bookdown::pdf_document2: 
+    toc: true
+    number_sections: true
+    toc_depth: 3
+---
+
+\newpage
+\setcounter{page}{1}
+```{r load packages and set options, include=FALSE}
+#install.packages('patchwork')
+#install.packages('moments')
+#install.packages("tidytuesdayR")
+library(tidyverse) 
+library(magrittr)
+library(knitr)
+library(patchwork)
+library(moments)
+
+theme_set(theme_bw())
+
+options(tinytex.verbose = TRUE)
+knitr::opts_chunk$set(echo=FALSE, message=FALSE)
+```
+
+
+```{r load-data, message=FALSE, inlcude=FALSE, message = FALSE, echo=FALSE}
+tuesdata <- tidytuesdayR::tt_load('2020-07-07')
+tuesdata <- tidytuesdayR::tt_load(2020, week = 28)
+coffee_ratings <- tuesdata$coffee_ratings
+```
+
+# Introduction
+-- Work in a causal relationship based research design
+
+Coffee is one of the most popular non-alcoholic beverages globally prized for its aroma and caffeine content. Coffee is brewed from roasted beans of the plant species Coffea, which is native to sub-Saharan Africa and individual islands in the Indian Ocean. Ever since its discovery, coffee has grown to more than 70 tropical countries, making up a multi-billion dollar market. Despite being consumed for over 120 years, there are still new trends entering the market every year, shifting the popularity of different coffee types. Some of these trends include different beans, different caffeine concentration, and different brewing techniques. Because of the constant changes in coffee trends, everything from the variety of the plant, the chemistry of the soil, the weather, the amount of rainfall and sunshine, and even the precise altitude at which the coffee grows can affect the taste of the final product. 
+
+In an effort to understand what drives the popularity of coffee, our team proposed an investigation following the question:
+
+\begin{quote}
+  \textit{How does the country of origin affect the popularity of a coffee?}
+\end{quote}
+
+Our research team believes that answering this question would enable us to identify how different factors affect the rating of coffee. Ultimately, the result of our analysis would help ACME with identifying new coffee products to include in the store by prioritizing features as well as with improving our marketing strategy.
+
+
+#Operationalization 
+Prior to looking at the data set, we conceptualized the popularity of a coffee as a rating point, out of 100, given to a cup of coffee and the country of origin as the country that the coffee bean came from. Some covariates that we planned to consider in the study are `flavor` and `aroma`. We conceptualized both`flavor` and `aroma` as a numerical grade, out of 10, given to a cup of coffee.  
+
+Our analysis will use the 2020 coffee data set gather by tidytuesday\footnote{Rfordatascience. (2020). Tidytuesday/readme.md at master · rfordatascience/tidytuesday. 
+GitHub. Retrieved March 23, 2022, from 
+https://github.com/rfordatascience/tidytuesday/blob/master/data/2020/2020-07-  
+07/readme.md}. We planned to use some of the observational data collected as follows:
+
+* First, we use column named `total_cup_points` that came with the data set as our measurement for our conceptualization for the popularity of coffee. This column is already given as a numerical value out of 100, so the closer to 100 means the more popular that specific cup of coffee. Since this is a numerical value, we will apply the appropriate transformation to get the value normally distributed. We will also filter out extraneous variables such as infinity, NaN, NAs as need in our modeling process.
+
+* Second, the 
+
+
+After the data is collected and processed, we plan to tackle this problem by building several models to capture the question. The first model will capture the effect of country of origin on coffee ratings. Because there could be other confounding variables, we want to also look into other covariates including flavor and processing method. These features will be added to a second model to capture their effect. Additional models will be needed in the study to provide a more conclusive result.
+
+
+## 2. A description of the Data and Research Design
+
+After you have presented the introduction and the concepts that are under investigation, what data are you going to use to answer the questions? What type of research design are you using? What type of models are you going to estimate, and what goals do you have for these models?
+
+We are using an explanatory research design to help answer the question.
+types of models - linear regression models 
+goals - to see if there is a relationship between country of origin and total cup points
+
+### 2a. A Model Building Process
+```{r message=FALSE}
+# install.packages("lmtest")
+install.packages("sandwich")
+library(dplyr)
+library(ggplot2)
+library(lmtest)
+library(sandwich)
+
+```
+
+#### Import data
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+tuesdata <- tidytuesdayR::tt_load('2020-07-07')
+tuesdata <- tidytuesdayR::tt_load(2020, week = 28)
+coffee_ratings <- tuesdata$coffee_ratings
+```
+
+#### Look into variables of interest
+##### Outcome Variable: Total Cup Points 
+```{r}
+ggplot(coffee_ratings, aes(total_cup_points)) +
+  geom_histogram(bins = 20) +
+  ggtitle("Distribution of Total Cup Points")
+```
+
+We see an outlier of 0 cup points, so we will proceed with removing the outlier.
+```{r}
+coffee_ratings <- coffee_ratings %>% filter(total_cup_points > 0)
+ggplot(coffee_ratings, aes(total_cup_points)) +
+  geom_histogram(bins = 20) +
+  ggtitle("Distribution of Total Cup Points After Removing Outlier")
+```
+After removing the outlier, we can see a slight skew to the left but the overall distribution looks good and no other transformation seems to be needed.
+
+##### Distribution of Total Cup Points by Top 5 Country of Origin
+```{r}
+# determine top 5 countries of origin
+top5_countries <- coffee_ratings %>% 
+  select(country_of_origin) %>%
+  group_by(country_of_origin) %>% 
+  summarise(count = n()) %>%
+  arrange(desc(count)) %>%
+  head(5)
+top5_countries <- top5_countries$country_of_origin
+
+# filter df
+top5 <- coffee_ratings %>%
+  filter(country_of_origin %in% top5_countries)
+ggplot(top5, aes(total_cup_points, fill=country_of_origin)) +
+  geom_histogram(bins = 20) +
+  facet_grid(country_of_origin ~.) +
+  ggtitle("Distribution of Total Cup Points by Country of Origin")
+```
+
+
+##### Distribution of Total Cup Points by Processing Method
+```{r}
+ggplot(coffee_ratings, aes(total_cup_points, fill=processing_method)) +
+  geom_histogram(bins = 20) +
+  facet_grid(processing_method ~.) +
+  ggtitle("Distribution of Total Cup Points by Processing Method")
+```
+
+
+1. *What do you want to measure*? Make sure you identify one, or a few, variables that will allow you to derive conclusions relevant to your research question, and include those variables in all model specifications. How are the variables that you will be modeling distributed? Provide enough context and information about your data for your audience to understand whatever model results you will eventually present. 
+
+2. What [covariates](https://en.wikipedia.org/wiki/Dependent_and_independent_variables#Statistics_synonyms) help you achieve your modeling goals? Are there problematic covariates?  either due to *collinearity*, or because they will absorb some of a causal effect you want to measure? 
+
+3. What *transformations*, if any, should you apply to each variable? These transformations might reveal linearities in the data, make our results relevant, or help us meet model assumptions.
+
+
+4. Are your choices supported by exploratory data analysis (*EDA*)? You will likely start with some general EDA to *detect anomalies* (missing values, top-coded variables, etc.). From then on, your EDA should be interspersed with your model building. Use visual tools to *guide* your decisions. You can also leverage statistical *tests* to help assess whether variables, or groups of variables, are improving model fit.
+
+At the same time, it is important to remember that you are not trying to create one perfect model. You will create several specifications, giving the reader a sense of how robust (or sensitive) your results are to modeling choices, and to show that you're not just cherry-picking the specification that leads to the largest effects.
+
+At a minimum, you need to estimate at least three model specifications: 
+
+The first model you include should include *only the key variables* you want to measure. These variables might be transformed, as determined by your EDA, but the model should include the absolute minimum number of covariates (usually zero or one covariate that is so crucial it would be unreasonable to omit it).
+
+Additional models should each be defensible, and should continue to tell the story of how product features contribute to product success. This might mean including additional right-hand side features to remove omitted variable bias identified by your casual theory; or, instead, it might mean estimating a model that examines a related concept of success, or a model that investigates a heterogeneous effect. These models, and your modeling process should be defensible, incremental, and clearly explained at all points.
+
+Your goal is to choose models that encircle the space of reasonable modeling choices, and to give an overall understanding of how these choices impact results.
+
+# Model Building
+
+1. The distribution is normal
+
+2. maybe cultural aspect between country and processing method
+
+3. Outliers removal, Filtering to top 5 countries of origin. the linear model one hot encoded the countries and processing method. 
+
+4. Yes -> include some graphs from above
+
+```{r}
+model_1 <- lm(total_cup_points ~ I(country_of_origin), data = top5)
+summary(model)
+```
+
+
+a. maybe a relationship limitation between our covariates
+
+```{r}
+model_2  <- lm(total_cup_points ~ I(country_of_origin) + flavor + aroma, data = top5)
+summary(model_2)
+```
+
+```{r}
+model_3  <- lm(total_cup_points ~ I(country_of_origin) + flavor + aroma + I(flavor*aroma), data = top5)
+summary(model_3)
+```
+
+```{r}
+
+coeftest(model_1, vcovHC(model_1))
+
+```
+
+### 4. A Results Section
+
+```{r}
+# install.packages("stargazer")
+library(stargazer)
+
+stargazer(model_1, model_2, model_3,
+          no.space=TRUE,
+          type='text')
+
+```
+
+ 4 out of 5 countries shows statistical significant, so we could reject the null, country of origin does have an effect on coffee.
+make some comments here.
