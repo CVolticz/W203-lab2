@@ -20,6 +20,10 @@ library(magrittr)
 library(knitr)
 library(patchwork)
 library(moments)
+library(dplyr)
+library(ggplot2)
+library(lmtest)
+library(sandwich)
 
 theme_set(theme_bw())
 
@@ -35,8 +39,6 @@ coffee_ratings <- tuesdata$coffee_ratings
 ```
 
 # Introduction
--- Work in a causal relationship based research design
-
 Coffee is one of the most popular non-alcoholic beverages globally prized for its aroma and caffeine content. Coffee is brewed from roasted beans of the plant species Coffea, which is native to sub-Saharan Africa and individual islands in the Indian Ocean. Ever since its discovery, coffee has grown to more than 70 tropical countries, making up a multi-billion dollar market. Despite being consumed for over 120 years, there are still new trends entering the market every year, shifting the popularity of different coffee types. Some of these trends include different beans, different caffeine concentration, and different brewing techniques. Because of the constant changes in coffee trends, everything from the variety of the plant, the chemistry of the soil, the weather, the amount of rainfall and sunshine, and even the precise altitude at which the coffee grows can affect the taste of the final product. 
 
 In an effort to understand what drives the popularity of coffee, our team proposed an investigation following the question:
@@ -45,150 +47,117 @@ In an effort to understand what drives the popularity of coffee, our team propos
   \textit{How does the country of origin affect the popularity of a coffee?}
 \end{quote}
 
-Our research team believes that answering this question would enable us to identify how different factors affect the rating of coffee. Ultimately, the result of our analysis would help ACME with identifying new coffee products to include in the store by prioritizing features as well as with improving our marketing strategy.
+Our research planned to tackle this question using the the coffee data set gather by tidytuesday\footnote{Rfordatascience. (2020). Tidytuesday/readme.md at master · rfordatascience/tidytuesday. 
+GitHub. Retrieved March 23, 2022, from 
+https://github.com/rfordatascience/tidytuesday/blob/master/data/2020/2020-07-  
+07/readme.md}. Our team believes that answering this question would enable us to identify how different factors affect the rating of coffee. Ultimately, the result of our analysis would help ACME with identifying new coffee products to include in the store by prioritizing features as well as with improving our marketing strategy.
 
 
 #Operationalization 
-Prior to looking at the data set, we conceptualized the popularity of a coffee as a rating point, out of 100, given to a cup of coffee and the country of origin as the country that the coffee bean came from. Some covariates that we planned to consider in the study are `flavor` and `aroma`. We conceptualized both`flavor` and `aroma` as a numerical grade, out of 10, given to a cup of coffee.  
+Prior to looking at the data set, we conceptualized the popularity of a coffee as a rating point named, out of 100, given to a cup of coffee and the country of origin as the country that the coffee bean came from. Some covariates that we planned to consider in the study are `flavor` and `aroma`. We conceptualized both`flavor` and `aroma` as a numerical grade, out of 10, given to a cup of coffee. 
 
-Our analysis will use the 2020 coffee data set gather by tidytuesday\footnote{Rfordatascience. (2020). Tidytuesday/readme.md at master · rfordatascience/tidytuesday. 
+As mentioned, our analysis will use the 2020 coffee data set gather by tidytuesday\footnote{Rfordatascience. (2020). Tidytuesday/readme.md at master · rfordatascience/tidytuesday. 
 GitHub. Retrieved March 23, 2022, from 
 https://github.com/rfordatascience/tidytuesday/blob/master/data/2020/2020-07-  
-07/readme.md}. We planned to use some of the observational data collected as follows:
+07/readme.md}. We planned to operationalize some of the observational data collected as follows:
 
 * First, we use column named `total_cup_points` that came with the data set as our measurement for our conceptualization for the popularity of coffee. This column is already given as a numerical value out of 100, so the closer to 100 means the more popular that specific cup of coffee. Since this is a numerical value, we will apply the appropriate transformation to get the value normally distributed. We will also filter out extraneous variables such as infinity, NaN, NAs as need in our modeling process.
 
-* Second, the 
+* Second, we identified both the `flavor` and `aroma` covariates as additional variables that affect coffee rating. These two variables are recorded as numerical value range from 0 to 10, where 0 is the lowest grade given and 10 is the highest rate given. Since these two covariates are numeric, we will apply the appropriate transformation to get the value normally distributed.   
 
+* Finally, we plan transformed the `flavor` and `aroma` using multiplication in order to create a interaction term. Doing so, we will be able to extract some form of non-perfect collinearity in our study. The results then be tested appropriately in this report. 
 
-After the data is collected and processed, we plan to tackle this problem by building several models to capture the question. The first model will capture the effect of country of origin on coffee ratings. Because there could be other confounding variables, we want to also look into other covariates including flavor and processing method. These features will be added to a second model to capture their effect. Additional models will be needed in the study to provide a more conclusive result.
+# Data Understanding 
+To answer our research question, we will be conducting an explanatory analysis using linear models to determine if there is a **causal** relationship between country of origin and total cup points. 
 
-
-## 2. A description of the Data and Research Design
-
-After you have presented the introduction and the concepts that are under investigation, what data are you going to use to answer the questions? What type of research design are you using? What type of models are you going to estimate, and what goals do you have for these models?
-
-We are using an explanatory research design to help answer the question.
-types of models - linear regression models 
-goals - to see if there is a relationship between country of origin and total cup points
-
-### 2a. A Model Building Process
-```{r message=FALSE}
-# install.packages("lmtest")
-install.packages("sandwich")
-library(dplyr)
-library(ggplot2)
-library(lmtest)
-library(sandwich)
-
-```
-
-#### Import data
-```{r message=FALSE, warning=FALSE, echo=FALSE}
-tuesdata <- tidytuesdayR::tt_load('2020-07-07')
-tuesdata <- tidytuesdayR::tt_load(2020, week = 28)
-coffee_ratings <- tuesdata$coffee_ratings
-```
-
-#### Look into variables of interest
-##### Outcome Variable: Total Cup Points 
+## Variables of Interest
+### Input Variable I: Country of Origin
+First, we will look at how many unique countries of origin are included in the data along with how many data points we have for each country. Looking at the results below, we see that out of 37 unique countries of origin, 80% of the data is comprised of top 10 countries and 60% of top 5. In order to simplify the model, we will filter to the top 5 countries of origin for the analysis.
 ```{r}
-ggplot(coffee_ratings, aes(total_cup_points)) +
-  geom_histogram(bins = 20) +
-  ggtitle("Distribution of Total Cup Points")
+# number of unique countries
+n_distinct(coffee_ratings$country_of_origin)
+
+# number of data points per country of origin for top 10
+nrows <- nrow(coffee_ratings)
+top10 <- coffee_ratings %>%
+  group_by(country_of_origin) %>%
+  summarise(count = n()) %>% 
+  arrange(desc(count)) %>%
+  mutate(prop = round(count/nrows*100, 2)) %>%
+  mutate(runningprop = round(cumsum(prop), 2)) %>%
+  head(10)
+top10
 ```
 
-We see an outlier of 0 cup points, so we will proceed with removing the outlier.
-```{r}
-coffee_ratings <- coffee_ratings %>% filter(total_cup_points > 0)
-ggplot(coffee_ratings, aes(total_cup_points)) +
-  geom_histogram(bins = 20) +
-  ggtitle("Distribution of Total Cup Points After Removing Outlier")
-```
-After removing the outlier, we can see a slight skew to the left but the overall distribution looks good and no other transformation seems to be needed.
-
-##### Distribution of Total Cup Points by Top 5 Country of Origin
+#### Distribution of Total Cup Points by Top 5 Countries of Origin
 ```{r}
 # determine top 5 countries of origin
-top5_countries <- coffee_ratings %>% 
-  select(country_of_origin) %>%
-  group_by(country_of_origin) %>% 
-  summarise(count = n()) %>%
-  arrange(desc(count)) %>%
+top5_countries <- top10 %>% 
   head(5)
 top5_countries <- top5_countries$country_of_origin
-
-# filter df
 top5 <- coffee_ratings %>%
-  filter(country_of_origin %in% top5_countries)
+  filter(country_of_origin %in% top5_countries) %>% 
+  group_by(country_of_origin) %>%
+  mutate(med = median(total_cup_points))
+
+# histogram of total cup points by countries of origin
 ggplot(top5, aes(total_cup_points, fill=country_of_origin)) +
   geom_histogram(bins = 20) +
   facet_grid(country_of_origin ~.) +
+  geom_vline(aes(xintercept = med, group = country_of_origin), colour = 'black', linetype='dotted') + 
   ggtitle("Distribution of Total Cup Points by Country of Origin")
 ```
+Looking at the histograms, we see that all countries of origin show a slight left skew with the distribution looking more symmetric past 70 total cup points. The distribution of each country looks fairly similar to each other, with their median aligning around 82 points.
 
-
-##### Distribution of Total Cup Points by Processing Method
+### Input Variable II: flavor
 ```{r}
-ggplot(coffee_ratings, aes(total_cup_points, fill=processing_method)) +
+ggplot(top5, aes(flavor)) +
   geom_histogram(bins = 20) +
-  facet_grid(processing_method ~.) +
-  ggtitle("Distribution of Total Cup Points by Processing Method")
+  ggtitle("Distribution of Flavor for Top 5 Countries")
+```
+The distribution of flavor looks fairly symmetric and normal with no heavy skews or outliers. It doesn't seem like any transformation would be needed.
+
+### Input Variable III: Aroma
+```{r}
+ggplot(top5, aes(aroma)) +
+  geom_histogram(bins = 20) +
+  ggtitle("Distribution of Flavor for Top 5 Countries")
+```
+The distribution of aroma has an outlier near 5, but it seems fairly normal overall and no additional transformation seems to be needed.
+
+### Outcome Variable: Total Cup Points 
+```{r histogram of total cup points}
+ggplot(coffee_ratings, aes(total_cup_points)) +
+  geom_histogram(bins = 20) +
+  ggtitle("Distribution of Total Cup Points for Original")
 ```
 
+However, since we are narrowing the scope down to top 5 countries of origin, we filter to top 5 and look at the distribution. The outlier of 0 points also get filtered out. 
 
-1. *What do you want to measure*? Make sure you identify one, or a few, variables that will allow you to derive conclusions relevant to your research question, and include those variables in all model specifications. How are the variables that you will be modeling distributed? Provide enough context and information about your data for your audience to understand whatever model results you will eventually present. 
+```{r histogram of total cup points for top 5 countries}
+ggplot(top5, aes(total_cup_points)) +
+  geom_histogram(bins = 20) +
+  ggtitle("Distribution of Total Cup Points for Top 5 Countries")
+```
 
-2. What [covariates](https://en.wikipedia.org/wiki/Dependent_and_independent_variables#Statistics_synonyms) help you achieve your modeling goals? Are there problematic covariates?  either due to *collinearity*, or because they will absorb some of a causal effect you want to measure? 
+After filtering to the top 5 countries of origin, we still see a slight skew to the left but the overall distribution looks good with data points looking fairly symmetric past the 70 total cup points and no other transformation seems to be needed.
 
-3. What *transformations*, if any, should you apply to each variable? These transformations might reveal linearities in the data, make our results relevant, or help us meet model assumptions.
-
-
-4. Are your choices supported by exploratory data analysis (*EDA*)? You will likely start with some general EDA to *detect anomalies* (missing values, top-coded variables, etc.). From then on, your EDA should be interspersed with your model building. Use visual tools to *guide* your decisions. You can also leverage statistical *tests* to help assess whether variables, or groups of variables, are improving model fit.
-
-At the same time, it is important to remember that you are not trying to create one perfect model. You will create several specifications, giving the reader a sense of how robust (or sensitive) your results are to modeling choices, and to show that you're not just cherry-picking the specification that leads to the largest effects.
-
-At a minimum, you need to estimate at least three model specifications: 
 
 The first model you include should include *only the key variables* you want to measure. These variables might be transformed, as determined by your EDA, but the model should include the absolute minimum number of covariates (usually zero or one covariate that is so crucial it would be unreasonable to omit it).
 
 Additional models should each be defensible, and should continue to tell the story of how product features contribute to product success. This might mean including additional right-hand side features to remove omitted variable bias identified by your casual theory; or, instead, it might mean estimating a model that examines a related concept of success, or a model that investigates a heterogeneous effect. These models, and your modeling process should be defensible, incremental, and clearly explained at all points.
 
-Your goal is to choose models that encircle the space of reasonable modeling choices, and to give an overall understanding of how these choices impact results.
 
-# Model Building
+# Model Specification & Building
+After the data is collected and processed, we plan to tackle this problem by building three models to better understand what make a highly rated cup of coffee. The first model will capture the effect of country of origin on coffee ratings. Based on the result of our exploratory data analysis, we identified that there are 37 unique countries. For simplification, will use only the top 5 countries with the most data recorded. The five countries that we include in our model are Brazil, Columbia, Guatemala, Mexico and Taiwan. Because there could be other confounding variables, our second models will include both `flavor` and `aroma` as additional covariates that could affect the rating of a cup of coffee. Furthermore, we wanted to better understand whether or not there is a non-perfect collinerarity relationship between `flavor` and `aroma`. For this, we applied a multiplication technique to create an interaction term between `flavor` and `aroma`.
 
-1. The distribution is normal
-
-2. maybe cultural aspect between country and processing method
-
-3. Outliers removal, Filtering to top 5 countries of origin. the linear model one hot encoded the countries and processing method. 
-
-4. Yes -> include some graphs from above
-
-```{r}
+```{r build-model, message=FALSE, warnings=FALSE}
+# build three models
 model_1 <- lm(total_cup_points ~ I(country_of_origin), data = top5)
-summary(model)
-```
-
-
-a. maybe a relationship limitation between our covariates
-
-```{r}
 model_2  <- lm(total_cup_points ~ I(country_of_origin) + flavor + aroma, data = top5)
-summary(model_2)
-```
-
-```{r}
 model_3  <- lm(total_cup_points ~ I(country_of_origin) + flavor + aroma + I(flavor*aroma), data = top5)
-summary(model_3)
 ```
 
-```{r}
-
-coeftest(model_1, vcovHC(model_1))
-
-```
 
 ### 4. A Results Section
 
@@ -196,11 +165,50 @@ coeftest(model_1, vcovHC(model_1))
 # install.packages("stargazer")
 library(stargazer)
 
-stargazer(model_1, model_2, model_3,
+stargazer(model_1, 
+          model_2, 
+          model_3,
+          title="Factors Affecting Coffee Ratings",
+          align=TRUE,
+          dep.var.labels=c("Total Cup Points"),
+          covariate.labels=c("Columnbia", "Guatemala", 
+                             "Mexico", "Taiwan", 
+                             "Flavor", "Aroma", 
+                             "Flavor-Aroma Interaction"),
           no.space=TRUE,
           type='text')
 
 ```
 
- 4 out of 5 countries shows statistical significant, so we could reject the null, country of origin does have an effect on coffee.
-make some comments here.
+- Because country of origin are given as categorical variable, one of the category is dropped to preserve dummy variable. Here, the first model shows that 4 out of 5 countries shows statistically significant p-value, suggesting that country of origin does affect the rating given to a cup of coffee. At baseline, when Brazil is the country of origin, holding everything else 0, the total cup point is approximately 82.4. Interestingly, only Columbia is showed to have a positive coefficients, suggesting that coffee originating from Columbia added approximately 0.701 points to the total cup point when comparing to coffee originating from Brazil. Both Guatemala and Mexico both have negative coefficients, suggesting that there is a decrease in the total cup point by 0.559 points coffee originating from Guatemala and 1.516 points for coffee originating from Mexico when comparing to coffee originate from Brazil. Finally, coffee originating from Taiwan did not show up as being statistically significant. However, it also have a negative coefficient. We can interpreted this in a similar fashion where coffee originating from Taiwan decrease the total cup point by 0.405 points.
+
+- As mentioned, the second model includes two covariates `flavors` and `aroma`. In our analysis, both covariates are statistically significant. For interpretation, we see that if the coffee is originated from Brazil, an increase in 1 point of flavor grade, while holding aroma grade constant,added 5.525 points to the total cup point. Similarly, an increase in 1 point in aroma grade, holding flavor grade constant, added about 0.989 points to the total cup point. 
+
+- Because flavor and aroma can have a non-perfect collinearity, we wanted to address how an interaction term between these two covariates would affect our model. Unfortunately, the coefficients obtained for this interaction term in our third model is not statistically significant. However, we can see that the coefficient obtained is negative, suggesting that there is a negative relationship between flavor and aroma grade. Essentially, having great flavor and poor aroma, or vice versa, might yield a higher total cup point compared to great flavor and great aroma.
+
+# Limitation of the Model
+
+With any plant, soil has a big impact on its overall health and ability to deliver nutrients where they’re needed. In terms of coffee, the plant needs to have the right nutrient levels to deliver nutrients to the cherry. A coffee plant that lacks nutrients will result in underdeveloped fruit and an inconsistency in size and maturation of the cherry. In bad cases, the seeds will simply decompose and have really severe deformations. On the flip side, a tree that is nurtured to grow will invite biodiversity.
+
+The best thing about the differences between particular coffees is in the ‘terroir’. This means that the differences in flavor between coffees are specific to the region they’re from. Often, people will have an origin that they really love, and this isn’t just a pretentious way of looking at things. You can genuinely pick up differences from origin to origin, and if given the chance to taste side by side, anyone could spot differences. Broadly, we can name three main coffee growing regions; Africa, America and Asia.
+
+-- talk about Guatemala
+
+It would be remiss to just say ‘the Americas’. There really are three areas in America that export coffee – North, Central and South. Coffee from Costa Rica, Honduras, Guatemala and Panama is used in Central America. Guatemalan coffees are much like raw cacao, and boost the quality of many blends.
+
+-- we can shrink the above to a more concise form and talk only about Guatemala
+
+South America is easily the largest producer of coffee in the world. It contains the number one (Brazil), and number three (Colombia) in terms of the countries that export the most coffee produce. Brazil’s coffees are not as clean as those from Central America, but are very balanced, and contribute sweet chocolate and caramel to blends. Colombians are similar, but are usually a little crisper in their acidity, and will give blends a sweetness of panela and maple syrup. Different environmental and regional factors influence that subtle and dramatic taste differences between coffees. Soil, altitude, sun, wind and rainfall all play a part in shaping the flavor of your daily cup.
+
+-- add some details here to gradually transition, talk about data transformations, mitigation
+
+## Large Model Assumption
+1. IID
+It seems that we can assume that both the conditions of Independent and Identically Distributed (IID) are satisfied - the data points we consider are independent of each other due to subtle differences across various countries of origin and are identically distributed since there is no overall trend and the distribution does not fluctuate, has finite variance and approaches a normal distribution. We are excluding external factors like climatic change, pests, diseases etc. Additionally, we are looking at the same random variable drawn from a set of over 9500 data points which essentially translates to normality based on the CLT.
+
+2. Unique BLP exits
+
+
+
+###Structural limitations of your model
+
