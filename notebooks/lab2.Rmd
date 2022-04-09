@@ -2,6 +2,8 @@
 title: "What Make Coffee Popular?"
 author: "Ken Trinh, Michelle Lee, Tanmay Mahapatra"
 date: "03/30/2022"
+header-includes:
+   - \usepackage{dcolumn}
 output:
   bookdown::pdf_document2: 
     toc: true
@@ -24,6 +26,10 @@ library(dplyr)
 library(ggplot2)
 library(lmtest)
 library(sandwich)
+library(readr)
+library(stargazer)
+library(xtable)
+
 
 theme_set(theme_bw())
 
@@ -33,47 +39,51 @@ knitr::opts_chunk$set(echo=FALSE, message=FALSE)
 
 
 ```{r load-data, message=FALSE, inlcude=FALSE, message = FALSE, echo=FALSE}
-tuesdata <- tidytuesdayR::tt_load('2020-07-07')
-tuesdata <- tidytuesdayR::tt_load(2020, week = 28)
-coffee_ratings <- tuesdata$coffee_ratings
+# Data set from tidy tuesday, we downloaded the data to mitigate API outputs
+# tuesdata <- tidytuesdayR::tt_load('2020-07-07')
+# tuesdata <- tidytuesdayR::tt_load(2020, week = 28)
+# coffee_ratings <- tuesdata$coffee_ratings
+coffee_ratings <- read_csv("../data/coffee_ratings.csv")
 ```
 
 # Introduction
-Coffee is one of the most popular non-alcoholic beverages globally prized for its aroma and caffeine content. Coffee is brewed from roasted beans of the plant species Coffea, which is native to sub-Saharan Africa and individual islands in the Indian Ocean. Ever since its discovery, coffee has grown to more than 70 tropical countries, making up a multi-billion dollar market. Despite being consumed for over 120 years, there are still new trends entering the market every year, shifting the popularity of different coffee types. Some of these trends include different beans, different caffeine concentration, and different brewing techniques. Because of the constant changes in coffee trends, everything from the variety of the plant, the chemistry of the soil, the weather, the amount of rainfall and sunshine, and even the precise altitude at which the coffee grows can affect the taste of the final product. 
+Coffee is one of the most popular non-alcoholic beverages globally prized for its attributes. Coffee is brewed from roasted beans of the plant species Coffea, which is native to sub-Saharan Africa and individual islands in the Indian Ocean. Ever since its discovery, coffee has grown to more than 70 tropical countries, making up a multi-billion dollar market. Despite being consumed for over 120 years, there are still new trends entering the market every year, shifting the popularity of different coffee types. Some of these trends include different beans, caffeine concentration, and brewing techniques. Constant changes in coffee trends - everything from the variety of the plant, the chemistry of the soil, the weather, the amount of rainfall and sunshine, and even the precise altitude at which the coffee grows - can affect the popularity of the final product. 
 
 In an effort to understand what drives the popularity of coffee, our team proposed an investigation following the question:
 
-\begin{quote}
+\begin{center}
   \textit{How does the country of origin affect the popularity of a coffee?}
-\end{quote}
+\end{center}
 
-Our research planned to tackle this question using the the coffee data set gather by tidytuesday\footnote{Rfordatascience. (2020). Tidytuesday/readme.md at master · rfordatascience/tidytuesday. 
+Our research planned to tackle this question using the coffee data set gathered by tidytuesday\footnote{Rfordatascience. (2020). Tidytuesday/readme.md at master · rfordatascience/tidytuesday. 
 GitHub. Retrieved March 23, 2022, from 
 https://github.com/rfordatascience/tidytuesday/blob/master/data/2020/2020-07-  
-07/readme.md}. Our team believes that answering this question would enable us to identify how different factors affect the rating of coffee. Ultimately, the result of our analysis would help ACME with identifying new coffee products to include in the store by prioritizing features as well as with improving our marketing strategy.
+07/readme.md}. We believe that answering this question would enable us to identify how different factors affect the rating of coffee. Ultimately, the result of our analysis would help ACME with identifying new coffee products to include in the store by prioritizing features as well as with improving our marketing strategy.
 
+# Operationalization 
+We conceptualized the popularity of coffee as a rating point given to a cup of coffee out of 100 points and country of origin as the country that the coffee bean came from. Some covariates that we plan to consider in the study are `flavor` and `aroma`. We conceptualized both of these two covariates as a numerical grade given to the coffee bean out of 10.
 
-#Operationalization 
-Prior to looking at the data set, we conceptualized the popularity of a coffee as a rating point named, out of 100, given to a cup of coffee and the country of origin as the country that the coffee bean came from. Some covariates that we planned to consider in the study are `flavor` and `aroma`. We conceptualized both`flavor` and `aroma` as a numerical grade, out of 10, given to a cup of coffee. 
-
-As mentioned, our analysis will use the 2020 coffee data set gather by tidytuesday\footnote{Rfordatascience. (2020). Tidytuesday/readme.md at master · rfordatascience/tidytuesday. 
+As mentioned, our analysis will use the 2020 coffee data set gathered by tidytuesday\footnote{Rfordatascience. (2020). Tidytuesday/readme.md at master · rfordatascience/tidytuesday. 
 GitHub. Retrieved March 23, 2022, from 
 https://github.com/rfordatascience/tidytuesday/blob/master/data/2020/2020-07-  
-07/readme.md}. We planned to operationalize some of the observational data collected as follows:
+07/readme.md}. We planned to operationalize the observational data collected as follows:
 
-* First, we use column named `total_cup_points` that came with the data set as our measurement for our conceptualization for the popularity of coffee. This column is already given as a numerical value out of 100, so the closer to 100 means the more popular that specific cup of coffee. Since this is a numerical value, we will apply the appropriate transformation to get the value normally distributed. We will also filter out extraneous variables such as infinity, NaN, NAs as need in our modeling process.
+* First, we use a column named `total_cup_points` that came with the data set as a measurement for our conceptualization for the popularity of coffee. This variable is already given as a numerical value out of 100 - the greater the value, the more popular the coffee is. Since this is a numerical value, we will apply the appropriate transformation to get the value normally distributed. We will also filter out extraneous variables such as infinity, NaN, NAs as needed in our modeling process.
 
-* Second, we identified both the `flavor` and `aroma` covariates as additional variables that affect coffee rating. These two variables are recorded as numerical value range from 0 to 10, where 0 is the lowest grade given and 10 is the highest rate given. Since these two covariates are numeric, we will apply the appropriate transformation to get the value normally distributed.   
+* Second, we identified our main input variable of interest - `county_of_origin`. This variable represents the country that the coffee bean is from, such as Ethiopia, Brazil, and Peru.
 
-* Finally, we plan transformed the `flavor` and `aroma` using multiplication in order to create a interaction term. Doing so, we will be able to extract some form of non-perfect collinearity in our study. The results then be tested appropriately in this report. 
+* Third, we identified both the `flavor` and `aroma` covariates as additional variables that affect coffee bean rating. These two variables are recorded as numerical values ranging from 0 to 10, where 0 is the lowest grade given and 10 is the highest rate given. Since these two covariates are numeric, we will apply the appropriate transformation to get the value normally distributed.   
+
+* Finally, we plan to transform the `flavor` and `aroma` using multiplication in order to create an interaction term. Doing so, we will be able to extract some form of non-perfect collinearity information from these two variables. The results are then tested appropriately in this report. 
+
 
 # Data Understanding 
 To answer our research question, we will be conducting an explanatory analysis using linear models to determine if there is a **causal** relationship between country of origin and total cup points. 
 
-## Variables of Interest
-### Input Variable I: Country of Origin
-First, we will look at how many unique countries of origin are included in the data along with how many data points we have for each country. Looking at the results below, we see that out of 37 unique countries of origin, 80% of the data is comprised of top 10 countries and 60% of top 5. In order to simplify the model, we will filter to the top 5 countries of origin for the analysis.
-```{r}
+## Input Variable I: Country of Origin
+First, we will look at how many unique countries of origin are included in the data along with how many data points we have for each country. Looking at the results below, we see that out of 37 unique countries of origin, 80% of the data comprises top 10 countries and 60% of top 5. In order to simplify the model, we will filter to the top 5 countries of origin for the analysis.
+
+```{r data-country-of-origin-selection, message=FALSE, warning=FALSE}
 # number of unique countries
 n_distinct(coffee_ratings$country_of_origin)
 
@@ -86,11 +96,12 @@ top10 <- coffee_ratings %>%
   mutate(prop = round(count/nrows*100, 2)) %>%
   mutate(runningprop = round(cumsum(prop), 2)) %>%
   head(10)
-top10
+kable(as.data.frame(top10))
 ```
 
-#### Distribution of Total Cup Points by Top 5 Countries of Origin
-```{r}
+### Distribution of Total Cup Points by Top 5 Countries of Origin
+
+```{r dist-plot, fig.cap='Coffee Distribtion Top 5 Countries', fig.align='center', fig.width=6, fig.height = 4}
 # determine top 5 countries of origin
 top5_countries <- top10 %>% 
   head(5)
@@ -107,51 +118,85 @@ ggplot(top5, aes(total_cup_points, fill=country_of_origin)) +
   geom_vline(aes(xintercept = med, group = country_of_origin), colour = 'black', linetype='dotted') + 
   ggtitle("Distribution of Total Cup Points by Country of Origin")
 ```
-Looking at the histograms, we see that all countries of origin show a slight left skew with the distribution looking more symmetric past 70 total cup points. The distribution of each country looks fairly similar to each other, with their median aligning around 82 points.
+The histogram in Figure \@ref(fig:dist-plot) shows the distribution of `total_cup_point` with respect to countries of origin. For each of the country, the plot shows a slight left skew with the distribution looking more symmetric past 70 total cup points. The distribution of each country looks fairly similar to each other, with their median aligning around 82 points.
 
-### Input Variable II: flavor
-```{r}
+## Input Variable II: Flavor
+
+```{r flavor-dist, fig.cap='Distribution of Flavor for Top 5 Countries', fig.align='center', fig.width=4, fig.height = 3}
 ggplot(top5, aes(flavor)) +
   geom_histogram(bins = 20) +
   ggtitle("Distribution of Flavor for Top 5 Countries")
 ```
-The distribution of flavor looks fairly symmetric and normal with no heavy skews or outliers. It doesn't seem like any transformation would be needed.
+Figure \@ref(fig:flavor-dist) shows a distribution of `flavor` grade across the top 5 selected countries. The histogram looks fairly symmetric and normal with no heavy skews or outliers. For this variable, it doesn't seem like any transformation would be needed.
 
-### Input Variable III: Aroma
-```{r}
+## Input Variable III: Aroma
+
+```{r aroma-dist, fig.cap='Distribution of Aroma for Top 5 Countries', fig.align='center', fig.width=4, fig.height = 3}
 ggplot(top5, aes(aroma)) +
   geom_histogram(bins = 20) +
-  ggtitle("Distribution of Flavor for Top 5 Countries")
+  ggtitle("Distribution of Aroma for Top 5 Countries")
 ```
-The distribution of aroma has an outlier near 5, but it seems fairly normal overall and no additional transformation seems to be needed.
+Figure \@ref(fig:aroma-dist) shows a distribution of `aroma` grade across the top 5 selected countries. The histogram shows that `aroma` grade has an outlier near 5, but it seems fairly normal overall. We believe that no additional transformation is needed on this particular variable.
 
-### Outcome Variable: Total Cup Points 
-```{r histogram of total cup points}
-ggplot(coffee_ratings, aes(total_cup_points)) +
+## Outcome Variable: Total Cup Points 
+
+```{r total-cup-point-top-5, fig.cap='Total Distribution of Total Cup Points (Left) and Top 5 Countries Distribution of Total Cup Points', fig.align='center', fig.width=6, fig.height = 3}
+dist_1 <- ggplot(coffee_ratings, aes(total_cup_points)) +
   geom_histogram(bins = 20) +
-  ggtitle("Distribution of Total Cup Points for Original")
-```
+  ggtitle("Original Data Set")
 
-However, since we are narrowing the scope down to top 5 countries of origin, we filter to top 5 and look at the distribution. The outlier of 0 points also get filtered out. 
-
-```{r histogram of total cup points for top 5 countries}
-ggplot(top5, aes(total_cup_points)) +
+dist_2 <- ggplot(top5, aes(total_cup_points)) +
   geom_histogram(bins = 20) +
-  ggtitle("Distribution of Total Cup Points for Top 5 Countries")
+  ggtitle("Top 5 Countries")
+
+dist_1 | dist_2
 ```
 
-After filtering to the top 5 countries of origin, we still see a slight skew to the left but the overall distribution looks good with data points looking fairly symmetric past the 70 total cup points and no other transformation seems to be needed.
-
-
-The first model you include should include *only the key variables* you want to measure. These variables might be transformed, as determined by your EDA, but the model should include the absolute minimum number of covariates (usually zero or one covariate that is so crucial it would be unreasonable to omit it).
-
-Additional models should each be defensible, and should continue to tell the story of how product features contribute to product success. This might mean including additional right-hand side features to remove omitted variable bias identified by your casual theory; or, instead, it might mean estimating a model that examines a related concept of success, or a model that investigates a heterogeneous effect. These models, and your modeling process should be defensible, incremental, and clearly explained at all points.
-
+After filtering to the top 5 countries of origin, Figure \@ref(fig:total-cup-point-top-5) (right) shows that we still see a slight left skew. However, the `total_cup_point` distribution looks fairly symmetric past the 70 total cup points and no other transformation seems to be needed. Given that we have over 800 data points, we can apply CLT here and no additional transformation is needed.
 
 # Model Specification & Building
-After the data is collected and processed, we plan to tackle this problem by building three models to better understand what make a highly rated cup of coffee. The first model will capture the effect of country of origin on coffee ratings. Based on the result of our exploratory data analysis, we identified that there are 37 unique countries. For simplification, will use only the top 5 countries with the most data recorded. The five countries that we include in our model are Brazil, Columbia, Guatemala, Mexico and Taiwan. Because there could be other confounding variables, our second models will include both `flavor` and `aroma` as additional covariates that could affect the rating of a cup of coffee. Furthermore, we wanted to better understand whether or not there is a non-perfect collinerarity relationship between `flavor` and `aroma`. For this, we applied a multiplication technique to create an interaction term between `flavor` and `aroma`.
+After the data is collected and processed, we plan to tackle this problem by building three models to better understand what makes a highly rated cup of coffee. In each of these models, we will utilize the data outlined in Section 2 of this report. 
+
+## Model 1
+
+The first model will capture the effect of country of origin on coffee ratings. Based on the result of our exploratory data analysis, we identified that there are 37 unique countries. For simplification, we will use only the top 5 countries with the most data recorded. The five countries that we include in our model are Brazil, Columbia, Guatemala, Mexico and Taiwan. Here our model will drop one country as a dummy variable to avoid linear dependence. The following equation describes the first model:
+
+$$
+\begin{split}
+  total\_cup\_points = \beta_0 + \beta_1Columbia +\beta_2Mexico \\
+                     + \beta_3Guatemala + \beta_4Taiwan
+\end{split}
+$$
+
+## Model 2
+
+Because there could be other confounding variables, our second model will include both `flavor` and `aroma` as additional covariates that could affect the rating of a cup of coffee. We will add the two new covariates as a continuation of `model_1`. The following equation is a representation of the second model:
+
+$$
+\begin{split}
+  total\_cup\_points = \beta_0 + \beta_1Columbia +\beta_2Mexico \\
+                                + \beta_3Guatemala + \beta_4Taiwan \\
+                                + \beta_5Flavor + \beta_6Aroma
+\end{split}
+$$
+
+## Model 3
+
+Furthermore, we wanted to better understand whether or not there is a non-perfect collinearity relationship between `flavor` and `aroma` that could affect the model. For this, we applied a multiplication technique to create an interaction term between `flavor` and `aroma`. The following equation is a representation of the third model:
+
+$$
+\begin{split}
+  total\_cup\_points = \beta_0 + \beta_1Columbia +\beta_2Mexico \\
+                              + \beta_3Guatemala + \beta_4Taiwan \\
+                              + \beta_5Flavor + \beta_6Aroma \\
+                              + \beta_7Flavor\_Aroma\_Interaction
+\end{split}
+$$
+
 
 ```{r build-model, message=FALSE, warnings=FALSE}
+# select columns of interest
+top5 <- top5[, c("total_cup_points", "country_of_origin", "flavor", "aroma")]
 # build three models
 model_1 <- lm(total_cup_points ~ I(country_of_origin), data = top5)
 model_2  <- lm(total_cup_points ~ I(country_of_origin) + flavor + aroma, data = top5)
@@ -159,11 +204,22 @@ model_3  <- lm(total_cup_points ~ I(country_of_origin) + flavor + aroma + I(flav
 ```
 
 
-### 4. A Results Section
+# Results
 
-```{r}
+```{r stargazer-table, message=FALSE, warning=FALSE, results="asis"}
 # install.packages("stargazer")
-library(stargazer)
+
+## add robust standard error to this table
+# library(stargazer)
+
+cov1 <- vcovHC(model_1)
+cov2 <- vcovHC(model_2)
+cov3 <- vcovHC(model_3)
+
+robust_se_1 <- sqrt(diag(cov1))
+robust_se_2 <- sqrt(diag(cov2))
+robust_se_3 <- sqrt(diag(cov3))
+
 
 stargazer(model_1, 
           model_2, 
@@ -171,44 +227,100 @@ stargazer(model_1,
           title="Factors Affecting Coffee Ratings",
           align=TRUE,
           dep.var.labels=c("Total Cup Points"),
-          covariate.labels=c("Columnbia", "Guatemala", 
+          covariate.labels=c("Columbia", "Guatemala", 
                              "Mexico", "Taiwan", 
                              "Flavor", "Aroma", 
                              "Flavor-Aroma Interaction"),
           no.space=TRUE,
-          type='text')
+          se=list(cov1, cov2, cov3),
+          type='latex')
 
 ```
 
-- Because country of origin are given as categorical variable, one of the category is dropped to preserve dummy variable. Here, the first model shows that 4 out of 5 countries shows statistically significant p-value, suggesting that country of origin does affect the rating given to a cup of coffee. At baseline, when Brazil is the country of origin, holding everything else 0, the total cup point is approximately 82.4. Interestingly, only Columbia is showed to have a positive coefficients, suggesting that coffee originating from Columbia added approximately 0.701 points to the total cup point when comparing to coffee originating from Brazil. Both Guatemala and Mexico both have negative coefficients, suggesting that there is a decrease in the total cup point by 0.559 points coffee originating from Guatemala and 1.516 points for coffee originating from Mexico when comparing to coffee originate from Brazil. Finally, coffee originating from Taiwan did not show up as being statistically significant. However, it also have a negative coefficient. We can interpreted this in a similar fashion where coffee originating from Taiwan decrease the total cup point by 0.405 points.
+## Model 1 - Intepretation
+Because countries of origin are given as categorical variables, one of the categories is dropped to ensure linear independence. Here, the first model shows that 5 out of 5 countries have statistically significant p-values, suggesting that country of origin does affect the rating given to a cup of coffee. At baseline, when Brazil is the country of origin, the total cup point is approximately 82.4. Interestingly, only Columbia is shown to have a positive coefficient, suggesting that coffee originating from Columbia added approximately 0.701 points to the total cup point when compared to coffee originating from Brazil. Both Guatemala and Mexico have negative coefficients, suggesting that there is a decrease in the total cup point by 0.559 points for coffee originating from Guatemala and 1.516 points for coffee originating from Mexico when compared to coffee originating from Brazil. Finally, coffee originating from Taiwan is shown to have a negative coefficient. We can interpret this in a similar fashion where coffee originating from Taiwan decreases the total cup point by 0.405 points.
 
-- As mentioned, the second model includes two covariates `flavors` and `aroma`. In our analysis, both covariates are statistically significant. For interpretation, we see that if the coffee is originated from Brazil, an increase in 1 point of flavor grade, while holding aroma grade constant,added 5.525 points to the total cup point. Similarly, an increase in 1 point in aroma grade, holding flavor grade constant, added about 0.989 points to the total cup point. 
+## Model 2 - Interpretation
+As mentioned, the second model includes two covariates `flavors` and `aroma`. In our analysis, both covariates are statistically significant. For interpretation, we see that if the coffee originated from Brazil, an increase in 1 point of flavor grade, while holding aroma grade constant, added 5.525 points to the total cup point. Similarly, an increase in 1 point in aroma grade, holding flavor grade constant, added about 0.989 points to the total cup point. We can see a positive correlation between these two variables and total cup points.
 
-- Because flavor and aroma can have a non-perfect collinearity, we wanted to address how an interaction term between these two covariates would affect our model. Unfortunately, the coefficients obtained for this interaction term in our third model is not statistically significant. However, we can see that the coefficient obtained is negative, suggesting that there is a negative relationship between flavor and aroma grade. Essentially, having great flavor and poor aroma, or vice versa, might yield a higher total cup point compared to great flavor and great aroma.
+## Model 3 - Interpretation
+Because flavor and aroma can have a non-perfect collinearity, we wanted to address how an interaction term between these two covariates would affect our model. Unfortunately, the coefficients obtained for this interaction term in our third model is not statistically significant so the analysis here might not be too insightful.
 
-# Limitation of the Model
+## Covariates Enchancing Effect
+Since we broken our modeling processes into three models, we can assess the significance of the added covariates. To do so, we conducted an F-test or our models. Here we assume the null hypothesis that `model_1`, using only `country_of_origin`, is sufficient in explaining the variance of `total_cup_point` population.. Our alternative hypothesis is that `model_2`, adding `flavor` and `aroma`, is more sufficient in explaining the variance of `total_cup_point` population. Our group decided against including `model_3` in the F-test because we did not introducing any additional confounding variables that `model_2` did not already capture.
 
-With any plant, soil has a big impact on its overall health and ability to deliver nutrients where they’re needed. In terms of coffee, the plant needs to have the right nutrient levels to deliver nutrients to the cherry. A coffee plant that lacks nutrients will result in underdeveloped fruit and an inconsistency in size and maturation of the cherry. In bad cases, the seeds will simply decompose and have really severe deformations. On the flip side, a tree that is nurtured to grow will invite biodiversity.
 
-The best thing about the differences between particular coffees is in the ‘terroir’. This means that the differences in flavor between coffees are specific to the region they’re from. Often, people will have an origin that they really love, and this isn’t just a pretentious way of looking at things. You can genuinely pick up differences from origin to origin, and if given the chance to taste side by side, anyone could spot differences. Broadly, we can name three main coffee growing regions; Africa, America and Asia.
+```{r f-test for model_1 vs model_2} 
+f_test <- anova(model_1, model_2, test = 'F')
+kable(f_test)
 
--- talk about Guatemala
+```
 
-It would be remiss to just say ‘the Americas’. There really are three areas in America that export coffee – North, Central and South. Coffee from Costa Rica, Honduras, Guatemala and Panama is used in Central America. Guatemalan coffees are much like raw cacao, and boost the quality of many blends.
 
--- we can shrink the above to a more concise form and talk only about Guatemala
+According to the F-test, adding `flavor` and `aroma` increase the degree of freedom by 2. The F statistics is computed to be 702.56 with the p-value being less than .001, suggesting a statistically significant result. Therefore we would reject the null hypothesis, thus adding in the two covariates is better in explaining the variance of  `total_cup_point`. Essentially, this means that aside from country of origin, adding flavor and aroma of coffee beans also has an effect on the rating of coffee.
 
-South America is easily the largest producer of coffee in the world. It contains the number one (Brazil), and number three (Colombia) in terms of the countries that export the most coffee produce. Brazil’s coffees are not as clean as those from Central America, but are very balanced, and contribute sweet chocolate and caramel to blends. Colombians are similar, but are usually a little crisper in their acidity, and will give blends a sweetness of panela and maple syrup. Different environmental and regional factors influence that subtle and dramatic taste differences between coffees. Soil, altitude, sun, wind and rainfall all play a part in shaping the flavor of your daily cup.
 
--- add some details here to gradually transition, talk about data transformations, mitigation
+# Model Assumptions and Limitations
+We are looking at a sample drawn from a data set of over 800 data points which allows us to use the Central Limit Theorem (CLT) to approximate normality. Here, we will follow the Large Model Assumptions.
 
 ## Large Model Assumption
 1. IID
-It seems that we can assume that both the conditions of Independent and Identically Distributed (IID) are satisfied - the data points we consider are independent of each other due to subtle differences across various countries of origin and are identically distributed since there is no overall trend and the distribution does not fluctuate, has finite variance and approaches a normal distribution. We are excluding external factors like climatic change, pests, diseases etc. Additionally, we are looking at the same random variable drawn from a set of over 9500 data points which essentially translates to normality based on the CLT.
+
+The data set is not I.I.D.; The coffee rating of the given data set might not be independent of each other because:
+
+- Between countries, there is a relationship between geographic region and coffee species. In our data set, both Guatemala and Mexico are located in Central America, creating a geographic clustering. However, Figure \@ref(fig:dist-plot) shows that the distributions are not too different from each other. So we can continue with our modeling approach. 
+
+- The same taster may have rated various other coffee beans so their preferred one would be rated higher than the others. However, Figure \@ref(fig:total-cup-point-top-5) shows that the distributions is normally distributed. So we can continue with our modeling approach. 
+
+The data is not identically distributed. Since our data set consists ratings for mostly Arabica species of coffee beans we believe that the ratings cannot be assumed applicable to all species of coffee beans.
+
 
 2. Unique BLP exits
 
+In order to determine if a unique BLP exists, we need to assess the data and ensure that there is no perfect collinearity between variables.
+
+In the figures, we observe that the distribution does not exhibit large kurtosis which means that the it produces fewer and/or less extreme outliers and the covariance is measurable.
+
+In the coefficient table below, no variables were dropped during our modeling process. As such, we can conclude that a unique BLP exists for our linear model.
+
+```{r coefs, align='center'}
+model_coeficients <- as.data.frame(model_3$coefficients)
+model_coeficients <- model_coeficients %>% rename("coeficients" = "model_3$coefficients")
+kable(model_coeficients)
+
+```
 
 
-###Structural limitations of your model
+## Omitted Variable Bias 
+
+The factor being studied is in truth associated in the target population with few other factors that could influence the outcome of interest. We list the most important of them below:
+
+1. Caffeine Content
+
+Consumers are increasingly concerned about the caffeine levels of the coffee they drink. Caffeine has a flavor, plus it also reacts with other ingredients to produce new flavors, which can affect the flavor score. If the taster likes the flavor of a dark, bold roast, decaffeinated coffee probably won't taste as good to her so she is more likely to rate the former higher. On the other hand, if she likes a light roast, she might prefer the flavor of decaf and rate it higher. All things considered, we believe the caffeine content would have been an important factor to consider and it would be interesting to see how it affects the results.
+
+In this case the direction of bias is toward zero in that perhaps the caffeine content creates an affinity that prompts the consumer to rate one type of coffee bean higher than the others.
+
+2. Roasting Temperature
+
+Many consumers have favored roast choices, be it temperature or time. For instance consumers assume that the strong, rich flavor of darker roasts indicates a higher level of caffeine and may rate the corresponding bean higher. The perfect roast is a personal choice that is also sometimes influenced by national preference or geographic location. We believe this factor could also provide some interesting insight.
+
+In this case the direction of bias is yet again toward zero in that the consumers have a preference in taste that results from the roast (i.e. temperature and roasting time).
+
+3. Type of Soil/Fertilizer
+
+The differences between particular coffees are in the ‘terroir’. Different environmental and regional factors influence that subtle and dramatic taste differences between coffees. Soil, altitude, sun, wind and rainfall all play a part in shaping the flavor of the coffee.
+
+In this case perhaps the direction of bias is toward zero since the variation in the type of soil and the growing process across the countries contribute to the resulting attributes in the end product.
+
+
+# Conclusion
+## Overall Conclusion
+In this research, we set out to investigate the effect of country of origin on the popularity of coffee. To provide insight into the popularity of coffee, we gathered data based on the bean's country of origin, the flavor and the aroma of the bean, and the total rating given to a cup of coffee brewed using the bean. Here, the popularity of coffee is defined as the `total_cup_point` variable in our data set. Since there were many countries producing coffee beans, we limited our study to the top five countries. The two additional covariates used in this study are `flavor` and `aroma` grade for the bean. We filtered out our data set based on outliers to bring each variable to normality. The final data set used in this study has 807 observations and 7 variables. 
+From our analysis, we concluded that country of origin does have an effect on the popularity of coffee. However, the effect of each country is different. In our sample, only Columbian coffee beans show a positive effect on the total cup points when compared to Brazilian beans with an effect size of 0.701 units. Furthermore, our analysis shows that an increase of 1 point in `flavor` grade added 5.525 points to the total cup points and an increase of one point in `aroma` grade added 0.989 points to the total cup point. This result suggests that a high grade `flavor` or `aroma` statistically improved the popularity of a cup of coffee. Our analysis further shows that adding an interaction term between `flavor` and `aroma` is not statistically significant, suggesting that there is no collinearity between these two variables. 
+
+## Business Strategy and Further Studies
+While we believe that different sets of countries will show different results, we believe that it is fair to direct ACME's product research and development team to target a South American based coffee bean, particularly Brazil and Columbia, with high `flavor` and `aroma` grade as potential product to carry in our stores. Based on the result of our analysis, we believe that this strategy will boost the popularity of our coffee lineup, leading to more sales.
+
+While this might be a good short term solution, it should be noted that the data set used in this study lacks information on the caffeine contents, roasting temperature, and the type of soil used. Due to this limitation, we wish to include these additional information, along with their potential interactions, in future studies. Our reasoning is that the inclusion of these variables would reduce some of our omitted variables bias, leading to better models and insights. 
 
